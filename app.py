@@ -10,7 +10,8 @@ from emotion import EmotionDetector
 from twilio_handler import TwilioHandler
 import asyncio
 import json
-from twilio.twiml.voice_response import VoiceResponse
+from twilio.twiml.voice_response import VoiceResponse, Gather
+from urllib.parse import urljoin
 
 load_dotenv()
 
@@ -110,36 +111,62 @@ def handle_response():
     print(f"Request method: {request.method}")
     print(f"Request headers: {dict(request.headers)}")
     print(f"Request data: {request.get_data()}")
+    print(f"Form data: {request.form}")
+    print(f"Values: {request.values}")
     
     try:
         # Get speech input from Twilio
         speech_result = request.values.get('SpeechResult', '')
+        confidence = request.values.get('Confidence', '0')
         print(f"Speech result: {speech_result}")
+        print(f"Confidence: {confidence}")
         
         if not speech_result:
-            return twilio.create_voice_response("I didn't catch that. Could you please repeat?")
+            print("No speech detected")
+            response = VoiceResponse()
+            response.say("I didn't catch that. Could you please repeat?", voice='Polly.Amy')
+            response.redirect(urljoin(twilio.webhook_base_url, '/voice'))
+            return Response(str(response), mimetype='text/xml')
         
         # Process the speech input
+        print(f"Processing speech: {speech_result}")
+        
         # Detect emotion
         emotion = emotion_detector.detect_emotion(speech_result)
         emotion_intensity = emotion_detector.get_emotion_intensity(speech_result)
+        print(f"Detected emotion: {emotion} (intensity: {emotion_intensity})")
         
         # Process with NLP
         nlp_response = nlp.process_text(speech_result)
+        print(f"NLP response: {nlp_response}")
         
-        # Generate speech response
-        audio_response = tts.generate_speech(nlp_response)
+        # Create TwiML response with Gather for continuous conversation
+        response = VoiceResponse()
+        gather = Gather(
+            input='speech',
+            action=urljoin(twilio.webhook_base_url, '/handle-response'),
+            method='POST',
+            speech_timeout='3',
+            timeout='5',
+            language='en-US',
+            speech_model='phone_call'
+        )
+        gather.say(nlp_response, voice='Polly.Amy')
+        response.append(gather)
         
-        if not audio_response:
-            raise Exception("Failed to generate speech response")
+        # If no speech is detected, end the call gracefully
+        response.say("I didn't hear anything. Goodbye!", voice='Polly.Amy')
+        response.hangup()
         
-        # Create TwiML response
-        response = twilio.create_voice_response(nlp_response)
-        return Response(response, mimetype='text/xml')
+        twiml_response = str(response)
+        print(f"Generated TwiML response: {twiml_response}")
+        return Response(twiml_response, mimetype='text/xml')
         
     except Exception as e:
         print(f"Error processing response: {str(e)}")
-        return Response("<?xml version='1.0' encoding='UTF-8'?><Response><Say>I'm sorry, I encountered an error. Please try again.</Say></Response>", mimetype='text/xml')
+        response = VoiceResponse()
+        response.say("I'm sorry, I encountered an error. Please try again.", voice='Polly.Amy')
+        return Response(str(response), mimetype='text/xml')
 
 @app.route("/make-call", methods=['POST', 'OPTIONS'])
 def make_call():
