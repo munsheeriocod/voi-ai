@@ -2,7 +2,7 @@ from flask import request, jsonify
 import logging
 from .. import admin_bp # Import admin_bp from parent package
 from .auth import token_required
-from ...database import calls_collection # Import the calls collection
+from ...database import calls_collection, get_active_calls # Import get_active_calls
 # We'll add functions to fetch call and sentiment data from database.py soon
 
 # Configure logging
@@ -145,4 +145,62 @@ def call_sentiment_analysis():
         
     except Exception as e:
         logger.error(f"Error fetching sentiment data: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/calls/active', methods=['GET'])
+@token_required
+def list_active_calls():
+    """Get a list of currently active calls
+    ---
+    tags:
+      - Calls
+    responses:
+      200:
+        description: A list of active calls with customer information.
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              _id:
+                type: string
+              call_sid:
+                type: string
+              to_number:
+                type: string
+              status:
+                type: string
+              initiated_at:
+                type: string
+                format: date-time
+              customer:
+                type: object
+                properties:
+                  contact_id:
+                    type: string
+                  name:
+                    type: string
+                  email:
+                    type: string
+                  user_type:
+                    type: string
+                  plan:
+                    type: string
+                  country:
+                    type: string
+      500:
+        description: Internal server error.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
+    try:
+        active_calls = get_active_calls()
+        logger.info(f"Returning {len(active_calls)} active calls")
+        return jsonify(active_calls), 200
+        
+    except Exception as e:
+        logger.error(f"Error fetching active calls: {str(e)}")
         return jsonify({'error': str(e)}), 500 

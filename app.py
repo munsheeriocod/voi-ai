@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, Response, render_template
+from flask import Flask, request, Response, render_template, jsonify
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -14,7 +14,7 @@ from twilio.twiml.voice_response import VoiceResponse, Gather
 from urllib.parse import urljoin
 import logging
 from app.admin import admin_bp
-from app.database import init_db
+from app.database import init_db, contacts_collection, calls_collection, create_call, update_call_status, find_contact_by_phone
 from flasgger import Swagger
 
 # Load environment variables
@@ -47,6 +47,9 @@ CORS(app, resources={
         "allow_headers": ["Content-Type", "Authorization"]
     }
 })
+
+logger = logging.getLogger(__name__)
+
 
 # Set secret key
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key')
@@ -182,7 +185,41 @@ def handle_response():
 
 @app.route("/make-call", methods=['POST', 'OPTIONS'])
 def make_call():
-    """Make an outbound call"""
+    """Make an outbound call
+    ---
+    tags:
+      - Calls
+    parameters:
+      - name: to_number
+        in: formData
+        type: string
+        required: true
+        description: The phone number to call.
+    responses:
+      200:
+        description: Call initiated successfully.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+            call_sid:
+              type: string
+      400:
+        description: No phone number provided.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      500:
+        description: Failed to make call.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     print("Received request to /make-call")
     print(f"Request method: {request.method}")
     print(f"Request headers: {dict(request.headers)}")
@@ -209,30 +246,183 @@ def make_call():
         if not to_number:
             return {"error": "No phone number provided"}, 400
         
-        call_sid = twilio.make_call(to_number)
+        # Find the contact in the database
+        contact = find_contact_by_phone(to_number)
+        # Format the phone number with country code if necessary
+        formatted_to_number = to_number
+        if contact and 'country' in contact:
+            country = contact['country'].upper()
+            if country == 'UNITED STATES' and not to_number.startswith('+1'):
+                formatted_to_number = '' + to_number
+            elif country == 'INDIA' and not to_number.startswith('+91'):
+                formatted_to_number = '+91' + to_number
+
+        print(f"Formatted phone number for Twilio: {formatted_to_number}")
+
+        call_sid = twilio.make_call(formatted_to_number)
+        
         if call_sid:
-            return {"status": "success", "call_sid": call_sid}
+            print(f"Twilio call initiated successfully. Call SID: {call_sid}")
+            
+            # Create an entry in the calls collection
+            call_data = {
+                'to_number': to_number, # Store the original number
+                'call_sid': call_sid,
+                'status': 'initiated' # Initial status
+                # initiated_at and updated_at are added in create_call
+            }
+            created_call = create_call(call_data)
+            
+            if created_call:
+                print(f"Call record created in database: {created_call}")
+            else:
+                print("Failed to create call record in database")
+
+            return {"status": "success", "call_sid": call_sid}, 200
+            
+        print("Twilio failed to initiate call")
         return {"error": "Failed to make call"}, 500
+        
     except Exception as e:
         print(f"Error making call: {str(e)}")
         return {"error": str(e)}, 500
 
-@app.route("/call-status", methods=['POST'])
+@app.route("/call-status", methods=['GET', 'POST'])
 def call_status():
-    """Handle call status updates from Twilio"""
-    print("Received call status update")
-    print(f"Request method: {request.method}")
-    print(f"Request headers: {dict(request.headers)}")
-    print(f"Request data: {request.get_data()}")
-    
+    """Handle call status updates from Twilio
+    ---
+    tags:
+      - Calls
+    parameters:
+      - name: CallSid
+        in: formData
+        type: string
+        required: true
+        description: The unique identifier of the call.
+      - name: CallStatus
+        in: formData
+        type: string
+        required: true
+        description: The status of the call.
+    responses:
+      200:
+        description: Call status updated successfully.
+      400:
+        description: Missing CallSid or CallStatus.
+      500:
+        description: Internal server error.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     try:
+        
+        # Handle GET request (for testing/verification)
+        if request.method == 'GET':
+            return jsonify({
+                'status': 'ok',
+                'message': 'Call status endpoint is working',
+                'method': 'GET'
+            }), 200
+        
+        # Log raw request data
+        logger.info("Raw request data:")
+        logger.info(request.get_data())
+        
+        # Log all parameters Twilio sends
+        logger.info("=== Twilio Callback Parameters ===")
+        for key, value in request.values.items():
+            logger.info(f"{key}: {value}")
+        logger.info("=== End of Parameters ===")
+        
+        # Get required parameters
         call_sid = request.values.get('CallSid')
         call_status = request.values.get('CallStatus')
-        print(f"Call {call_sid} status: {call_status}")
-        return '', 200
+        
+        logger.info(f"Extracted CallSid: {call_sid}")
+        logger.info(f"Extracted CallStatus: {call_status}")
+        
+        if not call_sid or not call_status:
+            logger.warning("Missing CallSid or CallStatus in update")
+            return jsonify({
+                'error': 'Missing required parameters',
+                'received_params': dict(request.values)
+            }), 400
+            
+        # Map Twilio status to our internal status
+        status_mapping = {
+            'queued': 'queued',
+            'ringing': 'ringing',
+            'in-progress': 'in-progress',
+            'completed': 'completed',
+            'busy': 'busy',
+            'failed': 'failed',
+            'no-answer': 'no-answer',
+            'canceled': 'canceled'
+        }
+        
+        mapped_status = status_mapping.get(call_status, call_status)
+        logger.info(f"Call {call_sid} status updated from '{call_status}' to '{mapped_status}'")
+        
+        # Additional data to store with the status update
+        additional_data = {
+            'duration': request.values.get('CallDuration'),
+            'direction': request.values.get('Direction'),
+            'answered_by': request.values.get('AnsweredBy'),
+            'caller_name': request.values.get('CallerName'),
+            'from_number': request.values.get('From'),
+            'to_number': request.values.get('To'),
+            'parent_call_sid': request.values.get('ParentCallSid'),
+            'call_duration': request.values.get('CallDuration'),
+            'recording_url': request.values.get('RecordingUrl'),
+            'recording_sid': request.values.get('RecordingSid'),
+            'error_code': request.values.get('ErrorCode'),
+            'error_message': request.values.get('ErrorMessage'),
+            'api_version': request.values.get('ApiVersion'),
+            'forwarded_from': request.values.get('ForwardedFrom'),
+            'call_token': request.values.get('CallToken'),
+            'queue_time': request.values.get('QueueTime'),
+            'timestamp': request.values.get('Timestamp')
+        }
+        
+        # Clean up None values
+        additional_data = {k: v for k, v in additional_data.items() if v is not None}
+        logger.info(f"Additional data to store: {additional_data}")
+        
+        # Update the call record in the database
+        logger.info("Attempting to update call status in database...")
+        success, result = update_call_status(call_sid, mapped_status, additional_data)
+        
+        if not success:
+            logger.error(f"Failed to update call status: {result}")
+            return jsonify({
+                'error': 'Failed to update call status',
+                'details': str(result)
+            }), 500
+            
+        logger.info(f"Successfully updated call status for SID {call_sid}")
+        logger.info(f"Updated call data: {result}")
+        logger.info("=== Finished Processing Call Status Update ===")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Call status updated successfully',
+            'call_sid': call_sid,
+            'status': mapped_status
+        }), 200
+        
     except Exception as e:
-        print(f"Error processing call status: {str(e)}")
-        return '', 500
+        logger.error("=== Error in call_status endpoint ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.error("Full traceback:", exc_info=True)
+        logger.error("=== End of Error Log ===")
+        return jsonify({
+            'error': 'Internal server error',
+            'message': str(e)
+        }), 500
 
 if __name__ == "__main__":
     # SSL context configuration

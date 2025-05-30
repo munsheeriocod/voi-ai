@@ -393,4 +393,131 @@ def delete_contact_by_id(contact_id_str):
         
     except Exception as e:
         logger.error(f"Error deleting contact by ID {contact_id_str}: {str(e)}")
-        return False, str(e) 
+        return False, str(e)
+
+def create_call(call_data):
+    """Create a new call record in the calls collection"""
+    try:
+        logger.info(f"Attempting to create call record: {call_data}")
+        
+        # Add timestamps
+        now = datetime.utcnow()
+        call_data['initiated_at'] = call_data.get('initiated_at', now)
+        call_data['updated_at'] = now
+        
+        # Ensure initial status if not provided
+        call_data['status'] = call_data.get('status', 'initiated')
+        
+        # Look up customer information if phone number is provided
+        to_number = call_data.get('to_number')
+        if to_number:
+            contact = get_contact_by_phone(to_number)
+            if contact:
+                logger.info(f"Found contact for number {to_number}: {contact}")
+                # Add customer information to call data
+                call_data['customer'] = {
+                    'contact_id': str(contact['_id']),
+                    'name': contact.get('name'),
+                    'email': contact.get('email'),
+                    'user_type': contact.get('user_type'),
+                    'plan': contact.get('plan'),
+                    'country': contact.get('country')
+                }
+            else:
+                logger.warning(f"No contact found for number {to_number}")
+        
+        # Clean up any potential _id passed in the input data
+        call_data.pop('_id', None)
+        
+        result = calls_collection.insert_one(call_data)
+        
+        if result.inserted_id:
+            logger.info(f"Call record created successfully with ID: {result.inserted_id}")
+            # Return the created document with string _id
+            created_doc = calls_collection.find_one({'_id': result.inserted_id})
+            if created_doc:
+                created_doc['_id'] = str(created_doc['_id'])
+                return created_doc
+            else:
+                 logger.error("Call record insertion verification failed")
+                 return None
+        else:
+            logger.error("No document ID returned from call insert operation")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error creating call record: {str(e)}")
+        return None
+
+def update_call_status(call_sid, new_status, additional_data=None):
+    """Update the status of a call record in the calls collection"""
+    try:
+        logger.info(f"Attempting to update call status for SID {call_sid} to {new_status}")
+        
+        # Prepare update data
+        update_data = {
+            'status': new_status,
+            'updated_at': datetime.utcnow()
+        }
+        
+        # Add any additional data if provided
+        if additional_data:
+            update_data.update(additional_data)
+        
+        # Update the call record
+        result = calls_collection.update_one(
+            {'call_sid': call_sid},
+            {'$set': update_data}
+        )
+        
+        if result.matched_count == 0:
+            logger.warning(f"No call found with SID {call_sid} for status update")
+            return False, "Call not found"
+            
+        success = result.modified_count > 0
+        logger.info(f"Call status update for SID {call_sid} {'successful' if success else 'failed'}. Matched: {result.matched_count}, Modified: {result.modified_count}")
+        
+        # Get the updated document
+        updated_doc = calls_collection.find_one({'call_sid': call_sid})
+        if updated_doc:
+            updated_doc['_id'] = str(updated_doc['_id'])
+            return True, updated_doc
+            
+        return success, None
+        
+    except Exception as e:
+        logger.error(f"Error updating call status for SID {call_sid}: {str(e)}")
+        return False, str(e)
+
+def get_active_calls():
+    """Get all active calls with customer information"""
+    try:
+        logger.info("Fetching active calls")
+        
+        # Find calls that are in progress
+        active_statuses = ['initiated', 'ringing', 'in-progress']
+        active_calls = calls_collection.find({
+            'status': {'$in': active_statuses}
+        }).sort('initiated_at', -1)  # Most recent first
+        
+        # Convert to list and format _id
+        calls_list = []
+        for call in active_calls:
+            call['_id'] = str(call['_id'])
+            calls_list.append(call)
+            
+        logger.info(f"Found {len(calls_list)} active calls")
+        return calls_list
+        
+    except Exception as e:
+        logger.error(f"Error fetching active calls: {str(e)}")
+        return []
+
+def find_contact_by_phone(phone_number):
+    """Find a contact by their phone number."""
+    try:
+        contact = contacts_collection.find_one({'phone_number': phone_number})
+        return contact
+    except Exception as e:
+        logger.error(f"Error finding contact by phone number {phone_number}: {e}")
+        return None 

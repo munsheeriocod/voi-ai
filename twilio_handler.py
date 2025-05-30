@@ -113,7 +113,17 @@ class TwilioHandler:
                 from_=self.phone_number,
                 url=urljoin(self.webhook_base_url, '/voice'),
                 status_callback=urljoin(self.webhook_base_url, '/call-status'),
-                status_callback_event=['initiated', 'ringing', 'answered', 'completed'],
+                status_callback_event=[
+                    'initiated',    # Call is created
+                    'ringing',      # Phone is ringing
+                    'answered',     # Call is answered
+                    'in-progress',  # Call is in progress
+                    'completed',    # Call completed normally
+                    'busy',         # Line is busy
+                    'failed',       # Call failed
+                    'no-answer',    # No answer
+                    'canceled'      # Call was canceled
+                ],
                 status_callback_method='POST'
             )
             return call.sid
