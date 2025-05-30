@@ -12,6 +12,22 @@ import asyncio
 import json
 from twilio.twiml.voice_response import VoiceResponse, Gather
 from urllib.parse import urljoin
+import logging
+from app.admin.routes import admin_bp
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('app.log')
+    ]
+)
+
+# Create logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 load_dotenv()
 
@@ -33,6 +49,9 @@ tts = TextToSpeech()
 nlp = NLPProcessor()
 emotion_detector = EmotionDetector()
 twilio = TwilioHandler()
+
+# Register admin blueprint
+app.register_blueprint(admin_bp)
 
 @app.route('/')
 def index():
@@ -205,4 +224,19 @@ def call_status():
         return '', 500
 
 if __name__ == "__main__":
-    socketio.run(app, debug=True, port=5001)
+    # SSL context configuration
+    ssl_context = None
+    if os.getenv('FLASK_ENV') == 'production':
+        ssl_context = {
+            'ssl_version': 'PROTOCOL_TLS',
+            'certfile': os.getenv('SSL_CERT_PATH', 'ssl/cert.pem'),
+            'keyfile': os.getenv('SSL_KEY_PATH', 'ssl/key.pem')
+        }
+    
+    socketio.run(
+        app,
+        debug=True,
+        port=5001,
+        ssl_context=ssl_context,
+        host='0.0.0.0'
+    )
