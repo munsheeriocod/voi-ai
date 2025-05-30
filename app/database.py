@@ -520,4 +520,15 @@ def find_contact_by_phone(phone_number):
         return contact
     except Exception as e:
         logger.error(f"Error finding contact by phone number {phone_number}: {e}")
+        return None
+
+def get_call_by_sid(call_sid):
+    """Find a call record by its Call SID."""
+    try:
+        call = calls_collection.find_one({'call_sid': call_sid})
+        if call and '_id' in call:
+            call['_id'] = str(call['_id'])
+        return call
+    except Exception as e:
+        logger.error(f"Error finding call by SID {call_sid}: {e}")
         return None 

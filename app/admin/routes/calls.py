@@ -2,7 +2,7 @@ from flask import request, jsonify
 import logging
 from .. import admin_bp # Import admin_bp from parent package
 from .auth import token_required
-from ...database import calls_collection, get_active_calls # Import get_active_calls
+from ...database import calls_collection, get_active_calls, get_call_by_sid # Import necessary database functions
 # We'll add functions to fetch call and sentiment data from database.py soon
 
 # Configure logging
@@ -203,4 +203,64 @@ def list_active_calls():
         
     except Exception as e:
         logger.error(f"Error fetching active calls: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/calls/<string:call_sid>/recording', methods=['GET'])
+@token_required
+def get_call_recording(call_sid):
+    """Get the recording URL for a specific call
+    ---
+    tags:
+      - Calls
+    parameters:
+      - name: call_sid
+        in: path
+        type: string
+        required: true
+        description: The SID of the call to retrieve the recording for.
+    responses:
+      200:
+        description: The recording URL.
+        schema:
+          type: object
+          properties:
+            recording_url:
+              type: string
+      404:
+        description: Call or recording not found.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      500:
+        description: Internal server error.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
+    try:
+        logger.info(f"Attempting to fetch recording for call SID: {call_sid}")
+        
+        # Get the call record from the database
+        call = get_call_by_sid(call_sid)
+        
+        if not call:
+            logger.warning(f"Call not found for SID: {call_sid}")
+            return jsonify({'error': 'Call not found'}), 404
+            
+        # Check if recording_url exists in the call record
+        recording_url = call.get('recording_url') # recording_url is stored as a top-level field
+        
+        if recording_url:
+            logger.info(f"Found recording URL for SID {call_sid}: {recording_url}")
+            return jsonify({'recording_url': recording_url}), 200
+        else:
+            logger.warning(f"Recording URL not found for call SID: {call_sid}")
+            return jsonify({'error': 'Recording not found for this call'}), 404
+            
+    except Exception as e:
+        logger.error(f"Error fetching call recording for SID {call_sid}: {str(e)}")
         return jsonify({'error': str(e)}), 500 

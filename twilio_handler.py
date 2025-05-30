@@ -124,7 +124,8 @@ class TwilioHandler:
                     'no-answer',    # No answer
                     'canceled'      # Call was canceled
                 ],
-                status_callback_method='POST'
+                status_callback_method='POST',
+                record=True
             )
             return call.sid
         except Exception as e:
