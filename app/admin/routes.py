@@ -1,5 +1,5 @@
 import os
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 from datetime import datetime, timedelta
@@ -144,4 +144,56 @@ def import_contacts():
         
     except Exception as e:
         logger.error(f"CSV import error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/contacts/template', methods=['GET'])
+@token_required
+def download_template():
+    """Download a sample CSV template for contact import"""
+    try:
+        # Create a StringIO object to write the CSV
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write headers
+        writer.writerow([
+            'Name',
+            'Email',
+            'Phone',
+            'Country',
+            'User Type',
+            'Plan',
+            'Registration Status',
+            'Customer Care',
+            'Opt-out Ratio % (Last 30 Days)',
+            'Last Logged In At',
+            'Last Recharged At'
+        ])
+        
+        # Write sample data
+        writer.writerow([
+            'John Doe',
+            'john@example.com',
+            '+1234567890',
+            'USA',
+            'Premium',
+            'Monthly',
+            'Active',
+            'Catherine',
+            '2.5',
+            '2024-03-20 10:00:00',
+            '2024-03-19 15:30:00'
+        ])
+        
+        # Create the response
+        output.seek(0)
+        return send_file(
+            io.BytesIO(output.getvalue().encode('utf-8')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name='contact_import_template.csv'
+        )
+        
+    except Exception as e:
+        logger.error(f"Error generating template: {str(e)}")
         return jsonify({'error': str(e)}), 500 
