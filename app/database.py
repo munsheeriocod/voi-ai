@@ -2,6 +2,8 @@ from pymongo import MongoClient
 from datetime import datetime
 import os
 import logging
+from bson.objectid import ObjectId
+from pymongo.results import DeleteResult
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -139,6 +141,33 @@ def init_db():
         logger.error(f"Database initialization error: {str(e)}")
         raise
 
+def get_contact_by_id(contact_id_str):
+    """Get contact by ObjectId string"""
+    try:
+        # Validate the ObjectId string
+        if not ObjectId.is_valid(contact_id_str):
+            logger.error(f"Invalid ObjectId format: {contact_id_str}")
+            return None
+            
+        # Convert string to ObjectId
+        object_id = ObjectId(contact_id_str)
+        
+        # Find the document by ObjectId
+        contact = contacts_collection.find_one({'_id': object_id})
+        
+        if contact:
+            logger.info(f"Fetched contact with ID: {contact_id_str}")
+            # Convert ObjectId to string for JSON serialization
+            contact['_id'] = str(contact['_id'])
+            return contact
+        else:
+            logger.info(f"Contact not found with ID: {contact_id_str}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error fetching contact by ID: {str(e)}")
+        return None
+
 def get_contact_by_phone(phone_number):
     """Get contact by phone number"""
     try:
@@ -148,25 +177,59 @@ def get_contact_by_phone(phone_number):
         logger.error(f"Error fetching contact: {str(e)}")
         return None
 
-def get_all_contacts():
-    """Get all contacts from the database"""
+def get_all_contacts(page=1, per_page=10, sort_by='_id', sort_order='asc', search=None, filters=None):
+    """Get all contacts from the database with pagination, sorting, and filtering"""
     try:
-        # Find all documents in the contacts collection
-        contacts_cursor = contacts_collection.find({})
+        logger.info(f"Fetching contacts - Page: {page}, Per Page: {per_page}, Sort By: {sort_by}, Sort Order: {sort_order}, Search: {search}, Filters: {filters}")
         
-        # Convert ObjectId to string for JSON serialization
+        # Build query filter
+        query = {}
+        if search:
+            # Basic text search across relevant fields (adjust fields as needed)
+            query['$or'] = [
+                {'name': {'$regex': search, '$options': 'i'}},
+                {'email': {'$regex': search, '$options': 'i'}},
+                {'phone_number': {'$regex': search, '$options': 'i'}},
+                {'country': {'$regex': search, '$options': 'i'}},
+                {'user_type': {'$regex': search, '$options': 'i'}},
+                {'plan': {'$regex': search, '$options': 'i'}},
+                {'registration_status': {'$regex': search, '$options': 'i'}},
+                {'customer_care': {'$regex': search, '$options': 'i'}}
+            ]
+            
+        if filters:
+            # TODO: Implement specific field filtering based on filters dictionary
+            pass # Placeholder for now
+            
+        # Build sort order
+        sort_direction = 1 if sort_order == 'asc' else -1
+        sort = [(sort_by, sort_direction)]
+        
+        # Calculate skip and limit for pagination
+        skip = (page - 1) * per_page
+        limit = per_page
+        
+        # Perform the query with sorting, skip, and limit
+        contacts_cursor = contacts_collection.find(query).sort(sort).skip(skip).limit(limit)
+        
+        # Convert ObjectId to string for JSON serialization and collect results
         contacts_list = []
         for contact in contacts_cursor:
-            # Convert ObjectId to string
             if '_id' in contact:
                 contact['_id'] = str(contact['_id'])
             contacts_list.append(contact)
             
-        logger.info(f"Fetched {len(contacts_list)} contacts from database")
-        return contacts_list
+        logger.info(f"Fetched {len(contacts_list)} contacts from database with criteria")
+        
+        # Get total count for pagination info (without skip and limit)
+        total_count = contacts_collection.count_documents(query)
+        logger.info(f"Total contacts matching query: {total_count}")
+        
+        return contacts_list, total_count
+        
     except Exception as e:
-        logger.error(f"Error fetching all contacts: {str(e)}")
-        return []
+        logger.error(f"Error fetching contacts with criteria: {str(e)}")
+        return [], 0
 
 def count_active_calls():
     """Count the number of active calls in the calls collection"""
@@ -205,75 +268,52 @@ def get_dashboard_metrics():
         return {}
 
 def create_contact(contact_data):
-    """Create a new contact"""
+    """Create a new contact from mapped data"""
     try:
+        logger.info("Attempting to create contact...")
         
-        # Map CSV fields to database fields using exact header names
-        try:
-            mapped_data = {
-                'name': contact_data.get('name', ''),
-                'email': contact_data.get('email', ''),
-                'phone_number': contact_data.get('phone_number', ''),  # Using exact 'Phone' header
-                'country': contact_data.get('country', ''),
-                'user_type': contact_data.get('user_type', ''),
-                'plan': contact_data.get('plan', ''),
-                'registration_status': contact_data.get('registration_status', ''),
-                'customer_care': contact_data.get('customer_care', ''),
-                'opt_out_ratio': float(contact_data.get('opt_out_ratio', 0) or 0),
-                'created_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow(),
-                'last_logged_in': contact_data.get('last_logged_in_at', ''),
-                'last_recharged': contact_data.get('last_recharged_at', '')
-            }
-        except KeyError as ke:
-            logger.error(f"Missing key in contact data: {str(ke)}")
-            return None
-        except ValueError as ve:
-            logger.error(f"Error converting data: {str(ve)}")
-            return None
-        
-        # Validate required fields
-        if not mapped_data['phone_number']:
-            logger.error("Cannot create contact: Phone is required")
+        # Validate required fields (only phone_number is strictly required for creation)
+        phone_number = contact_data.get('phone_number')
+        if not phone_number:
+            logger.error("Cannot create contact: phone_number is required")
             return None
             
-        # Try to insert the document
-        try:
-            logger.info("Attempting to insert document into MongoDB...")
-            # Check if document already exists
-            existing = contacts_collection.find_one({'phone_number': mapped_data['phone_number']})
-            if existing:
-                logger.info(f"Contact with phone {mapped_data['phone_number']} already exists")
-                return None
-                
-            # Log the collection details before insert
-            logger.info(f"Collection name: {contacts_collection.name}")
-            logger.info(f"Database name: {db.name}")
-            logger.info(f"Current document count: {contacts_collection.count_documents({})}")
-            
-            result = contacts_collection.insert_one(mapped_data)
-            if result.inserted_id:
-                logger.info(f"Contact created successfully with ID: {result.inserted_id}")
-                # Verify the document was actually inserted
-                inserted_doc = contacts_collection.find_one({'_id': result.inserted_id})
-                if inserted_doc:
-                    logger.info(f"Verified document insertion: {inserted_doc}")
-                    # Double check the document count
-                    new_count = contacts_collection.count_documents({})
-                    logger.info(f"New document count: {new_count}")
-                    return result.inserted_id
-                else:
-                    logger.error("Document insertion verification failed")
-                    return None
+        # Check if document already exists using phone_number (unique index)
+        existing = contacts_collection.find_one({'phone_number': phone_number})
+        if existing:
+            logger.info(f"Contact with phone {phone_number} already exists")
+            # Optionally return existing contact ID or a specific indicator
+            return None # Or return existing['_id']
+        
+        # Add timestamps
+        now = datetime.utcnow()
+        contact_data['created_at'] = contact_data.get('created_at', now) # Allow overriding for imports if needed
+        contact_data['updated_at'] = now
+        
+        # Clean up any potential _id passed in the input data to avoid issues
+        contact_data.pop('_id', None)
+        
+        logger.info(f"Inserting document into MongoDB: {contact_data}")
+        result = contacts_collection.insert_one(contact_data)
+        
+        if result.inserted_id:
+            logger.info(f"Contact created successfully with ID: {result.inserted_id}")
+            # Verify the document was actually inserted (optional but good for debugging)
+            inserted_doc = contacts_collection.find_one({'_id': result.inserted_id})
+            if inserted_doc:
+                 logger.info(f"Verified document insertion for ID: {result.inserted_id}")
+                 # Convert ObjectId to string before returning
+                 inserted_doc['_id'] = str(inserted_doc['_id'])
+                 return inserted_doc # Return the created document with string _id
             else:
-                logger.error("No document ID returned from insert operation")
+                logger.error("Document insertion verification failed")
                 return None
-        except Exception as insert_error:
-            logger.error(f"Error during document insertion: {str(insert_error)}")
+        else:
+            logger.error("No document ID returned from insert operation")
             return None
             
-    except Exception as e:
-        logger.error(f"Error creating contact: {str(e)}")
+    except Exception as insert_error:
+        logger.error(f"Error during document insertion: {str(insert_error)}")
         return None
 
 def update_contact(phone_number, contact_data):
@@ -292,4 +332,65 @@ def update_contact(phone_number, contact_data):
         return success
     except Exception as e:
         logger.error(f"Error updating contact: {str(e)}")
-        return False 
+        return False
+
+def update_contact_by_id(contact_id_str, contact_data):
+    """Update an existing contact by ObjectId string"""
+    try:
+        logger.info(f"Attempting to update contact with ID: {contact_id_str} with data: {contact_data}")
+        # Validate the ObjectId string
+        if not ObjectId.is_valid(contact_id_str):
+            logger.error(f"Invalid ObjectId format for update: {contact_id_str}")
+            return False, "Invalid contact ID format"
+            
+        # Convert string to ObjectId
+        object_id = ObjectId(contact_id_str)
+        
+        # Prepare update data - remove _id if present and add updated_at
+        update_data = contact_data.copy() # Use a copy to not modify original dict
+        update_data.pop('_id', None)
+        update_data['updated_at'] = datetime.utcnow()
+        
+        result = contacts_collection.update_one(
+            {'_id': object_id},
+            {'$set': update_data}
+        )
+        
+        if result.matched_count == 0:
+            logger.warning(f"No contact found with ID {contact_id_str} for update.")
+            return False, "Contact not found"
+            
+        success = result.modified_count > 0
+        logger.info(f"Contact update by ID {contact_id_str} {'successful' if success else 'failed'}. Matched: {result.matched_count}, Modified: {result.modified_count}")
+        
+        return success, None # Return success status and no error message on success
+        
+    except Exception as e:
+        logger.error(f"Error updating contact by ID {contact_id_str}: {str(e)}")
+        return False, str(e)
+
+def delete_contact_by_id(contact_id_str):
+    """Delete a contact by ObjectId string"""
+    try:
+        logger.info(f"Attempting to delete contact with ID: {contact_id_str}")
+        # Validate the ObjectId string
+        if not ObjectId.is_valid(contact_id_str):
+            logger.error(f"Invalid ObjectId format for delete: {contact_id_str}")
+            return False, "Invalid contact ID format"
+            
+        # Convert string to ObjectId
+        object_id = ObjectId(contact_id_str)
+        
+        # Perform the delete operation
+        result: DeleteResult = contacts_collection.delete_one({'_id': object_id})
+        
+        if result.deleted_count == 0:
+            logger.warning(f"No contact found with ID {contact_id_str} for deletion.")
+            return False, "Contact not found"
+            
+        logger.info(f"Contact with ID {contact_id_str} deleted successfully.")
+        return True, None # Return success status and no error message on success
+        
+    except Exception as e:
+        logger.error(f"Error deleting contact by ID {contact_id_str}: {str(e)}")
+        return False, str(e) 
