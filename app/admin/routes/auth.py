@@ -6,7 +6,7 @@ from functools import wraps
 from ..utils.auth import token_required, verify_credentials, generate_token
 import os
 from werkzeug.security import generate_password_hash
-from . import admin_bp
+from .. import admin_bp
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -39,7 +39,53 @@ def token_required(f):
 
 @admin_bp.route('/login', methods=['POST'])
 def admin_login():
-    """Handle admin login"""
+    """Handle admin login
+    ---
+    tags:
+      - Authentication
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            username:
+              type: string
+            password:
+              type: string
+    responses:
+      200:
+        description: Login successful, returns JWT token.
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+            token:
+              type: string
+      400:
+        description: Invalid request body.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      401:
+        description: Invalid username or password.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+      500:
+        description: Internal server error.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     try:
         if not request.is_json:
             return jsonify({'error': 'Content-Type must be application/json'}), 400
@@ -74,5 +120,24 @@ def admin_login():
 @admin_bp.route('/verify', methods=['GET'])
 @token_required
 def verify_token():
-    """Verify JWT token validity"""
+    """Verify JWT token validity
+    ---
+    tags:
+      - Authentication
+    responses:
+      200:
+        description: Token is valid.
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+      401:
+        description: Invalid or missing token.
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+    """
     return jsonify({'message': 'Token is valid!'}), 200 

@@ -17,6 +17,7 @@ try:
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
     contacts_collection = db['contacts']
+    calls_collection = db['calls']
     
     # Test connection
     client.admin.command('ping')
@@ -46,7 +47,11 @@ def test_connection():
         
         # Test collection access
         count = contacts_collection.count_documents({})
-        logger.info(f"Collection access successful. Current document count: {count}")
+        logger.info(f"Contacts collection access successful. Current document count: {count}")
+        
+        # Test calls collection access
+        calls_count = calls_collection.count_documents({})
+        logger.info(f"Calls collection access successful. Current document count: {calls_count}")
         
         return True
     except Exception as e:
@@ -64,27 +69,31 @@ def check_database_state():
         
         # Get database info
         logger.info(f"Database name: {db.name}")
-        logger.info(f"Collection name: {contacts_collection.name}")
+        logger.info(f"Contacts Collection name: {contacts_collection.name}")
+        logger.info(f"Calls Collection name: {calls_collection.name}")
         
-        # Get document count
-        count = contacts_collection.count_documents({})
-        logger.info(f"Total documents in contacts collection: {count}")
+        # Get document count for contacts
+        contacts_count = contacts_collection.count_documents({})
+        logger.info(f"Total documents in contacts collection: {contacts_count}")
         
-        # Get a sample document if any exist
-        sample = contacts_collection.find_one()
-        if sample:
-            logger.info(f"Sample document: {sample}")
+        # Get document count for calls
+        calls_count = calls_collection.count_documents({})
+        logger.info(f"Total documents in calls collection: {calls_count}")
+        
+        # Get a sample document from contacts if any exist
+        sample_contact = contacts_collection.find_one()
+        if sample_contact:
+            logger.info(f"Sample contact document: {sample_contact}")
         else:
-            logger.info("No documents found in collection")
+            logger.info("No documents found in contacts collection")
             
-        # List all documents
-        all_docs = list(contacts_collection.find())
-        logger.info(f"Total documents found: {len(all_docs)}")
-        if all_docs:
-            logger.info("First few documents:")
-            for doc in all_docs[:3]:
-                logger.info(f"Document: {doc}")
-                
+        # Get a sample document from calls if any exist
+        sample_call = calls_collection.find_one()
+        if sample_call:
+            logger.info(f"Sample call document: {sample_call}")
+        else:
+            logger.info("No documents found in calls collection")
+            
         return True
     except Exception as e:
         logger.error(f"Error checking database state: {str(e)}")
@@ -138,6 +147,62 @@ def get_contact_by_phone(phone_number):
     except Exception as e:
         logger.error(f"Error fetching contact: {str(e)}")
         return None
+
+def get_all_contacts():
+    """Get all contacts from the database"""
+    try:
+        # Find all documents in the contacts collection
+        contacts_cursor = contacts_collection.find({})
+        
+        # Convert ObjectId to string for JSON serialization
+        contacts_list = []
+        for contact in contacts_cursor:
+            # Convert ObjectId to string
+            if '_id' in contact:
+                contact['_id'] = str(contact['_id'])
+            contacts_list.append(contact)
+            
+        logger.info(f"Fetched {len(contacts_list)} contacts from database")
+        return contacts_list
+    except Exception as e:
+        logger.error(f"Error fetching all contacts: {str(e)}")
+        return []
+
+def count_active_calls():
+    """Count the number of active calls in the calls collection"""
+    try:
+        # Assuming a 'status' field exists and 'active' indicates an active call
+        active_count = calls_collection.count_documents({'status': 'active'})
+        logger.info(f"Counted {active_count} active calls")
+        return active_count
+    except Exception as e:
+        logger.error(f"Error counting active calls: {str(e)}")
+        return 0
+
+def get_dashboard_metrics():
+    """Get key metrics for the dashboard"""
+    try:
+        logger.info("Fetching dashboard metrics")
+        
+        # Get total number of contacts
+        total_contacts = contacts_collection.count_documents({})
+        
+        # Get active calls count
+        active_calls = count_active_calls()
+        
+        metrics = {
+            "active_calls": active_calls,
+            "customer_retention": 0.0, # Placeholder
+            "churn_risk_alerts": 0, # Placeholder
+            "ai_success_rate": 0.0, # Placeholder
+            "total_contacts": total_contacts # Actual count
+        }
+        
+        logger.info(f"Dashboard metrics: {metrics}")
+        return metrics
+    except Exception as e:
+        logger.error(f"Error fetching dashboard metrics: {str(e)}")
+        return {}
 
 def create_contact(contact_data):
     """Create a new contact"""

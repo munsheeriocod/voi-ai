@@ -13,8 +13,9 @@ import json
 from twilio.twiml.voice_response import VoiceResponse, Gather
 from urllib.parse import urljoin
 import logging
-from app.admin.routes import admin_bp
+from app.admin import admin_bp
 from app.database import init_db
+from flasgger import Swagger
 
 # Load environment variables
 load_dotenv()
@@ -31,6 +32,9 @@ logging.basicConfig(
 
 # Create Flask app
 app = Flask(__name__)
+
+# Configure Swagger
+swagger = Swagger(app)
 
 # Initialize SocketIO
 socketio = SocketIO(app, cors_allowed_origins="*")
