@@ -14,6 +14,10 @@ from twilio.twiml.voice_response import VoiceResponse, Gather
 from urllib.parse import urljoin
 import logging
 from app.admin.routes import admin_bp
+from app.database import init_db
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -25,23 +29,23 @@ logging.basicConfig(
     ]
 )
 
-# Create logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-load_dotenv()
-
+# Create Flask app
 app = Flask(__name__)
-# More permissive CORS settings
+
+# Initialize SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Configure CORS
 CORS(app, resources={
     r"/*": {
         "origins": "*",
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"]
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
     }
 })
-app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'your-secret-key')
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Set secret key
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key')
 
 # Initialize components
 stt = SpeechToText()
@@ -50,7 +54,10 @@ nlp = NLPProcessor()
 emotion_detector = EmotionDetector()
 twilio = TwilioHandler()
 
-# Register admin blueprint
+# Initialize database
+init_db()
+
+# Register blueprints
 app.register_blueprint(admin_bp)
 
 @app.route('/')
