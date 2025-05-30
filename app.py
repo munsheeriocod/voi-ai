@@ -108,33 +108,17 @@ def voice():
 def handle_response():
     """Handle speech input and generate response"""
     print("Received request to /handle-response")
-    print(f"Request method: {request.method}")
-    print(f"Request headers: {dict(request.headers)}")
-    print(f"Request data: {request.get_data()}")
-    print(f"Form data: {request.form}")
-    print(f"Values: {request.values}")
+    print(f"Speech result: {request.values.get('SpeechResult', '')}")
     
     try:
         # Get speech input from Twilio
         speech_result = request.values.get('SpeechResult', '')
-        confidence = request.values.get('Confidence', '0')
-        print(f"Speech result: {speech_result}")
-        print(f"Confidence: {confidence}")
         
         if not speech_result:
-            print("No speech detected")
             response = VoiceResponse()
             response.say("I didn't catch that. Could you please repeat?", voice='Polly.Amy')
             response.redirect(urljoin(twilio.webhook_base_url, '/voice'))
             return Response(str(response), mimetype='text/xml')
-        
-        # Process the speech input
-        print(f"Processing speech: {speech_result}")
-        
-        # Detect emotion
-        emotion = emotion_detector.detect_emotion(speech_result)
-        emotion_intensity = emotion_detector.get_emotion_intensity(speech_result)
-        print(f"Detected emotion: {emotion} (intensity: {emotion_intensity})")
         
         # Process with NLP
         nlp_response = nlp.process_text(speech_result)
@@ -146,21 +130,19 @@ def handle_response():
             input='speech',
             action=urljoin(twilio.webhook_base_url, '/handle-response'),
             method='POST',
-            speech_timeout='3',
-            timeout='5',
+            speech_timeout='2',  # Reduced timeout
+            timeout='3',  # Reduced timeout
             language='en-US',
             speech_model='phone_call'
         )
-        gather.say(nlp_response, voice='Polly.Amy')
+        gather.say(nlp_response, voice='Polly.Amy', rate='1.1')  # Slightly faster speech rate
         response.append(gather)
         
         # If no speech is detected, end the call gracefully
         response.say("I didn't hear anything. Goodbye!", voice='Polly.Amy')
         response.hangup()
         
-        twiml_response = str(response)
-        print(f"Generated TwiML response: {twiml_response}")
-        return Response(twiml_response, mimetype='text/xml')
+        return Response(str(response), mimetype='text/xml')
         
     except Exception as e:
         print(f"Error processing response: {str(e)}")

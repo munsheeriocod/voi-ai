@@ -29,31 +29,48 @@ class TwilioHandler:
             str: TwiML response
         """
         try:
-            print(f"Creating voice response with text: {text_to_say}")
             response = VoiceResponse()
             gather = Gather(
                 input='speech',
                 action=urljoin(self.webhook_base_url, '/handle-response'),
                 method='POST',
-                speech_timeout='3',  # Wait 3 seconds for speech
-                timeout='5',  # Overall gather timeout
+                speech_timeout='2',
+                timeout='3',
                 language='en-US',
-                speech_model='phone_call'
+                speech_model='experimental_conversations',  # Better accuracy
+                enhanced='true',  # Better speech recognition
+                profanity_filter='false'  # Reduce processing
             )
-            gather.say(text_to_say, voice='Polly.Amy')
+            gather.say(
+                text_to_say,
+                voice='Polly.Joanna',  # Faster voice
+                rate='1.1',
+                pitch='+0%',
+                volume='+0dB'
+            )
             response.append(gather)
             
             # If no speech is detected, end the call gracefully
-            response.say("I didn't hear anything. Goodbye!", voice='Polly.Amy')
+            response.say(
+                "I didn't hear anything. Goodbye!",
+                voice='Polly.Joanna',
+                rate='1.1',
+                pitch='+0%',
+                volume='+0dB'
+            )
             response.hangup()
             
-            twiml_response = str(response)
-            print(f"Generated TwiML response: {twiml_response}")
-            return twiml_response
+            return str(response)
         except Exception as e:
             print(f"Error creating voice response: {str(e)}")
             response = VoiceResponse()
-            response.say("I'm sorry, I encountered an error. Please try again.", voice='Polly.Amy')
+            response.say(
+                "I'm sorry, I encountered an error. Please try again.",
+                voice='Polly.Joanna',
+                rate='1.1',
+                pitch='+0%',
+                volume='+0dB'
+            )
             return str(response)
 
     def handle_speech_input(self, speech_result):
