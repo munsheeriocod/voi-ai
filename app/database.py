@@ -4,13 +4,37 @@ import os
 import logging
 from bson.objectid import ObjectId
 from pymongo.results import DeleteResult
+from dotenv import load_dotenv
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Load environment variables
+load_dotenv()
+
 # MongoDB connection variables
-MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017')
-DB_NAME = os.getenv('MONGODB_DATABASE', 'voice_assistant')
+MONGO_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017')
+DB_NAME = os.getenv('MONGODB_DB_NAME', 'voice_assistant')
+
+# Global client instance
+_client = None
+
+def get_client():
+    """Get MongoDB client instance"""
+    global _client
+    if _client is None:
+        try:
+            _client = MongoClient(MONGO_URI)
+            logger.info("Connected to MongoDB")
+        except Exception as e:
+            logger.error(f"Error connecting to MongoDB: {str(e)}")
+            raise
+    return _client
+
+def get_db():
+    """Get database instance"""
+    client = get_client()
+    return client[DB_NAME]
 
 # MongoDB connection
 try:
@@ -125,20 +149,20 @@ def ensure_collection_exists():
         return False
 
 def init_db():
-    """Initialize database with indexes"""
+    """Initialize database connection and create indexes"""
     try:
-        # Test connection first
-        if not test_connection():
-            raise Exception("Database connection test failed")
-            
-        # Create unique index on phone_number
-        contacts_collection.create_index('phone_number', unique=True)
-        logger.info(f"Database initialized successfully: {DB_NAME}")
+        db = get_db()
         
-        # Check initial database state
-        check_database_state()
+        # Create indexes for pdf_knowledge_base collection
+        db.pdf_knowledge_base.create_index([("metadata.filename", 1)])
+        db.pdf_knowledge_base.create_index([("metadata.source", 1)])
+        db.pdf_knowledge_base.create_index([("metadata.category", 1)])
+        db.pdf_knowledge_base.create_index([("metadata.tags", 1)])
+        db.pdf_knowledge_base.create_index([("created_at", 1)])
+        
+        logger.info("Database initialized successfully")
     except Exception as e:
-        logger.error(f"Database initialization error: {str(e)}")
+        logger.error(f"Error initializing database: {str(e)}")
         raise
 
 def get_contact_by_id(contact_id_str):

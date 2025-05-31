@@ -31,7 +31,7 @@ class EmotionDetector:
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=10,
-                temperature=0.3
+                temperature=0.2
             )
             
             emotion = response.choices[0].message.content.strip().lower()
@@ -62,7 +62,7 @@ class EmotionDetector:
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=10,
-                temperature=0.3
+                temperature=0.2
             )
             
             intensity = float(response.choices[0].message.content.strip())

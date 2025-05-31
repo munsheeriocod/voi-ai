@@ -3,7 +3,7 @@ import logging
 from .. import admin_bp # Import admin_bp from parent package
 from .auth import token_required
 from ...database import calls_collection, get_active_calls, get_call_by_sid # Import necessary database functions
-# We'll add functions to fetch call and sentiment data from database.py soon
+from bson import ObjectId
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -11,76 +11,9 @@ logger = logging.getLogger(__name__)
 @admin_bp.route('/calls', methods=['GET'])
 @token_required
 def list_calls():
-    """Get a list of calls with pagination, sorting, and filtering
-    ---
-    tags:
-      - Calls
-    parameters:
-      - name: page
-        in: query
-        type: integer
-        description: Page number for pagination.
-        default: 1
-      - name: per_page
-        in: query
-        type: integer
-        description: Number of items per page.
-        default: 10
-      - name: sort_by
-        in: query
-        type: string
-        description: Field to sort by.
-      - name: sort_order
-        in: query
-        type: string
-        description: Sorting order (asc or desc).
-        enum:
-          - asc
-          - desc
-      - name: search
-        in: query
-        type: string
-        description: Search term to filter calls.
-      # TODO: Add other filtering parameters as needed
-    responses:
-      200:
-        description: A list of calls.
-        schema:
-          type: array
-          items:
-            type: object
-            # TODO: Define the schema for a call object
-            properties:
-              _id:
-                type: string
-              # Add other call properties here
-      500:
-        description: Internal server error.
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-    """
     try:
-        # TODO: Implement pagination, sorting, and filtering based on request arguments
-        
-        # For now, just fetching all calls
-        # This will need a dedicated function in database.py
-        # Example placeholder:
-        # calls = get_calls_from_db(request.args)
-        
-        # Placeholder implementation using the imported collection
-        calls_cursor = calls_collection.find({}) # Fetch all calls
-        calls_list = []
-        for call in calls_cursor:
-            # Convert ObjectId to string for JSON serialization
-            if '_id' in call:
-                call['_id'] = str(call['_id'])
-            # TODO: Format call data for the response if necessary
-            calls_list.append(call)
-            
-        logger.info(f"Returning {len(calls_list)} calls")
+        calls_cursor = calls_collection.find({}) 
+        calls_list = [convert_objectids(call) for call in calls_cursor]
         return jsonify(calls_list), 200
         
     except Exception as e:
@@ -263,4 +196,14 @@ def get_call_recording(call_sid):
             
     except Exception as e:
         logger.error(f"Error fetching call recording for SID {call_sid}: {str(e)}")
-        return jsonify({'error': str(e)}), 500 
+        return jsonify({'error': str(e)}), 500
+
+
+def convert_objectids(obj):
+    if isinstance(obj, dict):
+        return {k: convert_objectids(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_objectids(elem) for elem in obj]
+    elif isinstance(obj, ObjectId):
+        return str(obj)
+    return obj

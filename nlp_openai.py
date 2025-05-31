@@ -10,7 +10,7 @@ class NLPProcessor:
         self.system_prompt = """You are a helpful and friendly voice assistant. 
         Keep your responses very brief and natural-sounding for voice interaction.
         Aim for responses under 10 words when possible.
-        Focus on being helpful while maintaining a conversational tone.
+        Focus on being helpful while maintaining a conversational tone and do not reply to any questions asked outof the  context. Only reply from the RAG context.
         Avoid unnecessary pleasantries and get straight to the point."""
 
     def process_text(self, text):
@@ -31,7 +31,7 @@ class NLPProcessor:
                     {"role": "user", "content": text}
                 ],
                 max_tokens=100,
-                temperature=0.5,
+                temperature=0.2,
                 presence_penalty=0.1,
                 frequency_penalty=0.1,
                 top_p=0.9

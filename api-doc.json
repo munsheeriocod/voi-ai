@@ -1,0 +1,1087 @@
+{
+  "definitions": {},
+  "info": {
+    "description": "powered by Flasgger",
+    "termsOfService": "/tos",
+    "title": "A swagger API",
+    "version": "0.0.1"
+  },
+  "paths": {
+    "/admin/analytics/sentiment": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Start date for filtering sentiment data.",
+            "format": "date",
+            "in": "query",
+            "name": "start_date",
+            "type": "string"
+          },
+          {
+            "description": "End date for filtering sentiment data.",
+            "format": "date",
+            "in": "query",
+            "name": "end_date",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Call sentiment analysis data.",
+            "schema": {
+              "properties": {
+                "negative": {
+                  "type": "integer"
+                },
+                "neutral": {
+                  "type": "integer"
+                },
+                "positive": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Get call sentiment analysis data",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/admin/calls": {
+      "get": {
+        "parameters": [
+          {
+            "default": 1,
+            "description": "Page number for pagination.",
+            "in": "query",
+            "name": "page",
+            "type": "integer"
+          },
+          {
+            "default": 10,
+            "description": "Number of items per page.",
+            "in": "query",
+            "name": "per_page",
+            "type": "integer"
+          },
+          {
+            "description": "Field to sort by.",
+            "in": "query",
+            "name": "sort_by",
+            "type": "string"
+          },
+          {
+            "description": "Sorting order (asc or desc).",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "in": "query",
+            "name": "sort_order",
+            "type": "string"
+          },
+          {
+            "description": "Search term to filter calls.",
+            "in": "query",
+            "name": "search",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of calls.",
+            "schema": {
+              "items": {
+                "properties": {
+                  "_id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Get a list of calls with pagination, sorting, and filtering",
+        "tags": [
+          "Calls"
+        ]
+      }
+    },
+    "/admin/calls/active": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "A list of active calls with customer information.",
+            "schema": {
+              "items": {
+                "properties": {
+                  "_id": {
+                    "type": "string"
+                  },
+                  "call_sid": {
+                    "type": "string"
+                  },
+                  "customer": {
+                    "properties": {
+                      "contact_id": {
+                        "type": "string"
+                      },
+                      "country": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "plan": {
+                        "type": "string"
+                      },
+                      "user_type": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "initiated_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "to_number": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Get a list of currently active calls",
+        "tags": [
+          "Calls"
+        ]
+      }
+    },
+    "/admin/calls/{call_sid}/recording": {
+      "get": {
+        "parameters": [
+          {
+            "description": "The SID of the call to retrieve the recording for.",
+            "in": "path",
+            "name": "call_sid",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The recording URL.",
+            "schema": {
+              "properties": {
+                "recording_url": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "404": {
+            "description": "Call or recording not found.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Get the recording URL for a specific call",
+        "tags": [
+          "Calls"
+        ]
+      }
+    },
+    "/admin/contacts": {
+      "get": {
+        "parameters": [
+          {
+            "default": 1,
+            "description": "Page number for pagination.",
+            "in": "query",
+            "name": "page",
+            "type": "integer"
+          },
+          {
+            "default": 10,
+            "description": "Number of items per page.",
+            "in": "query",
+            "name": "per_page",
+            "type": "integer"
+          },
+          {
+            "default": "_id",
+            "description": "Field to sort by.",
+            "in": "query",
+            "name": "sort_by",
+            "type": "string"
+          },
+          {
+            "default": "asc",
+            "description": "Sorting order (asc or desc).",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "in": "query",
+            "name": "sort_order",
+            "type": "string"
+          },
+          {
+            "description": "Search term to filter contacts.",
+            "in": "query",
+            "name": "search",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of contacts with pagination metadata.",
+            "schema": {
+              "properties": {
+                "contacts": {
+                  "items": {
+                    "properties": {
+                      "_id": {
+                        "type": "string"
+                      },
+                      "country": {
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "customer_care": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string"
+                      },
+                      "last_logged_in": {
+                        "type": "string"
+                      },
+                      "last_recharged": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "opt_out_ratio": {
+                        "type": "number"
+                      },
+                      "phone_number": {
+                        "type": "string"
+                      },
+                      "plan": {
+                        "type": "string"
+                      },
+                      "registration_status": {
+                        "type": "string"
+                      },
+                      "updated_at": {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "user_type": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "page": {
+                  "type": "integer"
+                },
+                "per_page": {
+                  "type": "integer"
+                },
+                "total_count": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Get a list of all contacts",
+        "tags": [
+          "Contacts"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "properties": {
+                "country": {
+                  "description": "Country of the contact.",
+                  "type": "string"
+                },
+                "customer_care": {
+                  "description": "Customer care status.",
+                  "type": "string"
+                },
+                "email": {
+                  "description": "Email address of the contact.",
+                  "type": "string"
+                },
+                "last_logged_in": {
+                  "description": "Last logged in timestamp.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "last_recharged": {
+                  "description": "Last recharged timestamp.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Name of the contact.",
+                  "type": "string"
+                },
+                "opt_out_ratio": {
+                  "description": "Opt-out ratio.",
+                  "format": "float",
+                  "type": "number"
+                },
+                "phone_number": {
+                  "description": "Phone number of the contact (required).",
+                  "type": "string"
+                },
+                "plan": {
+                  "description": "User's plan (e.g., Monthly, Annual).",
+                  "type": "string"
+                },
+                "registration_status": {
+                  "description": "Registration status.",
+                  "type": "string"
+                },
+                "user_type": {
+                  "description": "Type of user (e.g., Premium, Standard).",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Contact created successfully.",
+            "schema": {
+              "properties": {
+                "_id": {
+                  "type": "string"
+                },
+                "country": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "customer_care": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "last_logged_in": {
+                  "type": "string"
+                },
+                "last_recharged": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "opt_out_ratio": {
+                  "type": "number"
+                },
+                "phone_number": {
+                  "type": "string"
+                },
+                "plan": {
+                  "type": "string"
+                },
+                "registration_status": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "user_type": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "400": {
+            "description": "Invalid input data.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "409": {
+            "description": "Contact with this phone number already exists.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Create a new contact",
+        "tags": [
+          "Contacts"
+        ]
+      }
+    },
+    "/admin/contacts/import": {
+      "post": {
+        "parameters": [
+          {
+            "description": "CSV file to import contacts.",
+            "in": "formData",
+            "name": "file",
+            "required": true,
+            "type": "file"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Import completed successfully.",
+            "schema": {
+              "properties": {
+                "contacts_created": {
+                  "type": "integer"
+                },
+                "contacts_updated": {
+                  "type": "integer"
+                },
+                "duplicate_rows": {
+                  "items": {
+                    "properties": {
+                      "phone": {
+                        "type": "string"
+                      },
+                      "row": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "duplicates_found": {
+                  "type": "integer"
+                },
+                "errors": {
+                  "items": {
+                    "properties": {
+                      "error": {
+                        "type": "string"
+                      },
+                      "row": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "rows_skipped": {
+                  "type": "integer"
+                },
+                "skipped_rows": {
+                  "items": {
+                    "properties": {
+                      "reason": {
+                        "type": "string"
+                      },
+                      "row": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "total_contacts": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "400": {
+            "description": "Invalid request or CSV file.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                },
+                "expected_headers": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "header_errors": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "normalized_headers": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "received_headers": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Handle bulk contact import via CSV",
+        "tags": [
+          "Contacts"
+        ]
+      }
+    },
+    "/admin/contacts/template": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "CSV template file."
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Download a sample CSV template for contact import",
+        "tags": [
+          "Contacts"
+        ]
+      }
+    },
+    "/admin/contacts/{contact_id}": {
+      "delete": {
+        "parameters": [
+          {
+            "description": "ID of the contact to delete.",
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contact deleted successfully.",
+            "schema": {
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "400": {
+            "description": "Invalid contact ID format.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "404": {
+            "description": "Contact not found.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Delete a contact by ID",
+        "tags": [
+          "Contacts"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "description": "ID of the contact to retrieve.",
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contact details.",
+            "schema": {
+              "properties": {
+                "_id": {
+                  "type": "string"
+                },
+                "country": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "customer_care": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "last_logged_in": {
+                  "type": "string"
+                },
+                "last_recharged": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "opt_out_ratio": {
+                  "type": "number"
+                },
+                "phone_number": {
+                  "type": "string"
+                },
+                "plan": {
+                  "type": "string"
+                },
+                "registration_status": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "user_type": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "404": {
+            "description": "Contact not found.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Get details of a single contact by ID",
+        "tags": [
+          "Contacts"
+        ]
+      },
+      "put": {
+        "parameters": [
+          {
+            "description": "ID of the contact to update.",
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "properties": {
+                "country": {
+                  "description": "Updated country of the contact.",
+                  "type": "string"
+                },
+                "customer_care": {
+                  "description": "Updated customer care status.",
+                  "type": "string"
+                },
+                "email": {
+                  "description": "Updated email address of the contact.",
+                  "type": "string"
+                },
+                "last_logged_in": {
+                  "description": "Updated last logged in timestamp.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "last_recharged": {
+                  "description": "Updated last recharged timestamp.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Updated name of the contact.",
+                  "type": "string"
+                },
+                "opt_out_ratio": {
+                  "description": "Updated opt-out ratio.",
+                  "format": "float",
+                  "type": "number"
+                },
+                "phone_number": {
+                  "description": "Updated phone number of the contact.",
+                  "type": "string"
+                },
+                "plan": {
+                  "description": "Updated user's plan.",
+                  "type": "string"
+                },
+                "registration_status": {
+                  "description": "Updated registration status.",
+                  "type": "string"
+                },
+                "user_type": {
+                  "description": "Updated type of user.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contact updated successfully.",
+            "schema": {
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "400": {
+            "description": "Invalid input data or contact ID format.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "404": {
+            "description": "Contact not found.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Update an existing contact by ID",
+        "tags": [
+          "Contacts"
+        ]
+      }
+    },
+    "/admin/login": {
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "properties": {
+                "password": {
+                  "type": "string"
+                },
+                "username": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Login successful, returns JWT token.",
+            "schema": {
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "token": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "401": {
+            "description": "Invalid username or password.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Handle admin login",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/admin/verify": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Token is valid.",
+            "schema": {
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "401": {
+            "description": "Invalid or missing token.",
+            "schema": {
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "summary": "Verify JWT token validity",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    }
+  },
+  "swagger": "2.0"
+}

@@ -1,8 +1,12 @@
 import os
+import logging
 from twilio.twiml.voice_response import VoiceResponse, Gather
 from twilio.rest import Client
 from dotenv import load_dotenv
 from urllib.parse import urljoin
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -17,6 +21,7 @@ class TwilioHandler:
             raise ValueError("Missing required Twilio credentials in environment variables")
             
         self.client = Client(self.account_sid, self.auth_token)
+        logger.info(f"TwilioHandler initialized with webhook base URL: {self.webhook_base_url}")
 
     def create_voice_response(self, text_to_say):
         """
@@ -37,16 +42,12 @@ class TwilioHandler:
                 speech_timeout='2',
                 timeout='3',
                 language='en-US',
-                speech_model='experimental_conversations',  # Better accuracy
-                enhanced='true',  # Better speech recognition
-                profanity_filter='false'  # Reduce processing
+                speech_model='phone_call'  # Changed to phone_call for better accuracy
             )
             gather.say(
                 text_to_say,
-                voice='Polly.Joanna',  # Faster voice
-                rate='1.1',
-                pitch='+0%',
-                volume='+0dB'
+                voice='Polly.Joanna',
+                rate='1.1'
             )
             response.append(gather)
             
@@ -54,22 +55,20 @@ class TwilioHandler:
             response.say(
                 "I didn't hear anything. Goodbye!",
                 voice='Polly.Joanna',
-                rate='1.1',
-                pitch='+0%',
-                volume='+0dB'
+                rate='1.1'
             )
             response.hangup()
             
-            return str(response)
+            twiml_response = str(response)
+            logger.info(f"Generated TwiML response: {twiml_response}")
+            return twiml_response
         except Exception as e:
-            print(f"Error creating voice response: {str(e)}")
+            logger.error(f"Error creating voice response: {str(e)}")
             response = VoiceResponse()
             response.say(
                 "I'm sorry, I encountered an error. Please try again.",
                 voice='Polly.Joanna',
-                rate='1.1',
-                pitch='+0%',
-                volume='+0dB'
+                rate='1.1'
             )
             return str(response)
 
@@ -107,27 +106,39 @@ class TwilioHandler:
         try:
             if not to_number:
                 raise ValueError("Phone number is required")
+            
+            # Ensure phone number is in E.164 format
+            if not to_number.startswith('+'):
+                to_number = '+' + to_number
                 
+            voice_url = urljoin(self.webhook_base_url, '/voice')
+            status_callback_url = urljoin(self.webhook_base_url, '/call-status')
+            
+            logger.info(f"Making call to {to_number}")
+            logger.info(f"Voice URL: {voice_url}")
+            logger.info(f"Status callback URL: {status_callback_url}")
+            
             call = self.client.calls.create(
                 to=to_number,
                 from_=self.phone_number,
-                url=urljoin(self.webhook_base_url, '/voice'),
-                status_callback=urljoin(self.webhook_base_url, '/call-status'),
+                url=voice_url,
+                status_callback=status_callback_url,
                 status_callback_event=[
-                    'initiated',    # Call is created
-                    'ringing',      # Phone is ringing
-                    'answered',     # Call is answered
-                    'in-progress',  # Call is in progress
-                    'completed',    # Call completed normally
-                    'busy',         # Line is busy
-                    'failed',       # Call failed
-                    'no-answer',    # No answer
-                    'canceled'      # Call was canceled
+                    'initiated',
+                    'ringing',
+                    'answered',
+                    'in-progress',
+                    'completed',
+                    'busy',
+                    'failed',
+                    'no-answer',
+                    'canceled'
                 ],
-                status_callback_method='POST',
-                record=True
+                status_callback_method='POST'
             )
+            
+            logger.info(f"Call created successfully with SID: {call.sid}")
             return call.sid
         except Exception as e:
-            print(f"Error making call: {str(e)}")
+            logger.error(f"Error making call: {str(e)}")
             raise
